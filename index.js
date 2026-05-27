@@ -26,7 +26,34 @@ async function run() {
   try {
     await client.connect();
     const db = client.db("pet-place");
-    const petsCollection = db.collection("all-pets");
+    const petsCollection = db.collection("all_pets");
+
+    app.post("/all_pets", async (req, res) => {
+      const petData = req.body;
+      // console.log("data received", desData);
+
+      const result = await petsCollection.insertOne(petData);
+      res.json(result);
+    });
+
+    app.get("/all_pets", async (req, res) => {
+      const result = await petsCollection.find().toArray();
+      res.json(result);
+    });
+
+    app.get("/all_pets/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await petsCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      res.json(result);
+    });
+
+    app.get("/my_listing/:email", async (req, res) => {
+      const { email } = req.params;
+      const result = await petsCollection.find({ ownerEmail: email }).toArray();
+      res.json(result);
+    });
 
     await client.db("admin").command({ ping: 1 });
 
