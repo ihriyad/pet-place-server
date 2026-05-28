@@ -22,6 +22,29 @@ const client = new MongoClient(uri, {
   },
 });
 
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
+const JWKS = createRemoteJWKSet(
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
+);
+const verifyToken = async (req, res, next) => {
+  const authHeader = req?.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  // console.log(token);
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+    console.log(payload);
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+};
+
 async function run() {
   try {
     await client.connect();
@@ -42,7 +65,28 @@ async function run() {
       res.json(result);
     });
 
-    app.get("/all_pets/:id", async (req, res) => {
+    app.get("/all_pets/search", async (req, res) => {
+      const { name, species } = req.query;
+
+      const query = {};
+
+      if (name) {
+        query.petName = { $regex: name, $options: "i" };
+      }
+
+      if (species) {
+        const speciesArray = Array.isArray(species) ? species : [species];
+        query.species = { $in: speciesArray };
+      }
+
+      const result = await petsCollection
+        .find(query)
+        .sort({ _id: -1 })
+        .toArray();
+      res.json(result);
+    });
+
+    app.get("/all_pets/:id", verifyToken, async (req, res) => {
       const { id } = req.params;
       const result = await petsCollection.findOne({
         _id: new ObjectId(id),
@@ -123,11 +167,11 @@ async function run() {
         .toArray();
       res.json(result);
     });
-    
+
     // owner approves or rejects a request
     app.patch("/requests/:id", async (req, res) => {
       const { id } = req.params;
-      const { status } = req.body; 
+      const { status } = req.body;
       const result = await requestsCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: { status } },
@@ -136,7 +180,7 @@ async function run() {
     });
 
     //cancel pet request
-     app.delete("/requests/:id", async (req, res) => {
+    app.delete("/requests/:id", async (req, res) => {
       const { id } = req.params;
       const { email } = req.query;
 
@@ -146,7 +190,9 @@ async function run() {
       if (pet.adopterEmail !== email)
         return res.status(403).json({ message: "Unauthorized" });
 
-      const result = await requestsCollection.deleteOne({ _id: new ObjectId(id) });
+      const result = await requestsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
       res.json(result);
     });
 
