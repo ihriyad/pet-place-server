@@ -123,6 +123,17 @@ async function run() {
         .toArray();
       res.json(result);
     });
+    
+    // owner approves or rejects a request
+    app.patch("/requests/:id", async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body; 
+      const result = await requestsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status } },
+      );
+      res.json(result);
+    });
 
     await client.db("admin").command({ ping: 1 });
 
