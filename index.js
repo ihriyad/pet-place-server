@@ -135,6 +135,21 @@ async function run() {
       res.json(result);
     });
 
+    //cancel pet request
+     app.delete("/requests/:id", async (req, res) => {
+      const { id } = req.params;
+      const { email } = req.query;
+
+      const pet = await requestsCollection.findOne({ _id: new ObjectId(id) });
+
+      if (!pet) return res.status(404).json({ message: "Pet not found" });
+      if (pet.adopterEmail !== email)
+        return res.status(403).json({ message: "Unauthorized" });
+
+      const result = await requestsCollection.deleteOne({ _id: new ObjectId(id) });
+      res.json(result);
+    });
+
     await client.db("admin").command({ ping: 1 });
 
     console.log(
