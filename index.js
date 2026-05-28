@@ -114,6 +114,16 @@ async function run() {
       res.json({ exists: !!existing, status: existing?.status || null });
     });
 
+    // get requests for a specific pet — owner sees who requested
+    app.get("/requests/pet/:petId", async (req, res) => {
+      const { petId } = req.params;
+      const result = await requestsCollection
+        .find({ petId })
+        .sort({ _id: -1 })
+        .toArray();
+      res.json(result);
+    });
+
     await client.db("admin").command({ ping: 1 });
 
     console.log(
