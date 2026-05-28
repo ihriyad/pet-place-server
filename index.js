@@ -27,6 +27,7 @@ async function run() {
     await client.connect();
     const db = client.db("pet-place");
     const petsCollection = db.collection("all_pets");
+    const requestsCollection = db.collection("requests");
 
     app.post("/all_pets", async (req, res) => {
       const petData = req.body;
@@ -37,7 +38,7 @@ async function run() {
     });
 
     app.get("/all_pets", async (req, res) => {
-      const result = await petsCollection.find().toArray();
+      const result = await petsCollection.find().sort({ _id: -1 }).toArray();
       res.json(result);
     });
 
@@ -51,11 +52,14 @@ async function run() {
 
     app.get("/my_listing/:email", async (req, res) => {
       const { email } = req.params;
-      const result = await petsCollection.find({ ownerEmail: email }).toArray();
+      const result = await petsCollection
+        .find({ ownerEmail: email })
+        .sort({ _id: -1 })
+        .toArray();
       res.json(result);
     });
 
-   //delete a pet using email
+    //delete a pet using email
     app.delete("/all_pets/:id", async (req, res) => {
       const { id } = req.params;
       const { email } = req.query;
@@ -68,6 +72,46 @@ async function run() {
 
       const result = await petsCollection.deleteOne({ _id: new ObjectId(id) });
       res.json(result);
+    });
+
+    app.patch("/all_pets/:id", async (req, res) => {
+      const { id } = req.params;
+      const updateData = req.body;
+      // console.log(updateData);
+      const result = await petsCollection.updateOne(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: updateData,
+        },
+      );
+      res.json(result);
+    });
+
+    app.post("/requests", async (req, res) => {
+      const request = req.body;
+      const result = await requestsCollection.insertOne(request);
+      res.json(result);
+    });
+    //find request via email
+    app.get("/requests/:email", async (req, res) => {
+      const email = decodeURIComponent(req.params.email);
+      const result = await requestsCollection
+        .find({ adopterEmail: email })
+        .sort({ _id: -1 })
+        .toArray();
+      res.json(result);
+    });
+
+    // check if a user already requested a specific pet
+    app.get("/requests/check/:petId/:email", async (req, res) => {
+      const { petId, email } = req.params;
+      const existing = await requestsCollection.findOne({
+        petId,
+        adopterEmail: decodeURIComponent(email),
+      });
+      res.json({ exists: !!existing, status: existing?.status || null });
     });
 
     await client.db("admin").command({ ping: 1 });
