@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 8000;
 const uri = process.env.MONGODB_URI;
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -22,25 +23,25 @@ const client = new MongoClient(uri, {
   },
 });
 
-const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 const JWKS = createRemoteJWKSet(
   new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
 );
 const verifyToken = async (req, res, next) => {
-  const authHeader = req?.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  const token = authHeader.split(" ")[1];
+  // console.log(req.headers)
+  const { authorization } = req.headers;
+  const token = authorization?.split(" ")[1];
+  // console.log(token);
   if (!token) {
     return res.status(401).json({ message: "Unauthorized" });
   }
-  // console.log(token);
   try {
+   
     const { payload } = await jwtVerify(token, JWKS);
-    console.log(payload);
+    req.user = payload;
+    // console.log(payload, "from payload");
     next();
   } catch (error) {
+    console.error("Token validation failed:", error);
     return res.status(401).json({ message: "Unauthorized" });
   }
 };
@@ -87,6 +88,7 @@ async function run() {
     });
 
     app.get("/all_pets/:id", verifyToken, async (req, res) => {
+      // console.log(req.user)
       const { id } = req.params;
       const result = await petsCollection.findOne({
         _id: new ObjectId(id),
